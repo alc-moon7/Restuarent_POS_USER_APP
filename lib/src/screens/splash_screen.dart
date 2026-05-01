@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../app_controller.dart';
+import '../app_scope.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -14,6 +18,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+  bool _bootstrapped = false;
 
   @override
   void initState() {
@@ -24,10 +29,14 @@ class _SplashScreenState extends State<SplashScreen>
     )..forward();
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
-    Future<void>.delayed(const Duration(milliseconds: 1600), () {
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/connect');
-    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_bootstrapped) return;
+    _bootstrapped = true;
+    unawaited(_bootstrap(AppScope.of(context)));
   }
 
   @override
@@ -36,8 +45,21 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  Future<void> _bootstrap(CustomerAppController app) async {
+    final minimumSplash = Future<void>.delayed(
+      const Duration(milliseconds: 1600),
+    );
+    await Future.wait([app.initialize(), minimumSplash]);
+    if (!mounted) return;
+
+    final connected = await app.autoConnect();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, connected ? '/menu' : '/connect');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final app = AppScope.of(context);
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
@@ -84,10 +106,14 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Order from your table',
+                    app.connectionTesting
+                        ? app.connectionMessage ??
+                              'Finding restaurant server...'
+                        : 'Order from your table',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

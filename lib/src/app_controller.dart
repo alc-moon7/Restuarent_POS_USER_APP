@@ -10,15 +10,18 @@ import 'repositories/menu_repository.dart';
 import 'repositories/order_repository.dart';
 import 'services/api_client_service.dart';
 import 'services/local_storage_service.dart';
+import 'services/server_discovery_client.dart';
 import 'services/websocket_service.dart';
 
 class CustomerAppController extends ChangeNotifier {
   CustomerAppController({
     ApiClientService? apiClient,
     LocalStorageService? storage,
+    ServerDiscoveryClient? discoveryClient,
     CustomerWebSocketService? webSocketService,
   }) : apiClient = apiClient ?? ApiClientService(),
        storage = storage ?? LocalStorageService(),
+       discoveryClient = discoveryClient ?? ServerDiscoveryClient(),
        webSocketService = webSocketService ?? CustomerWebSocketService() {
     menuRepository = MenuRepository(this.apiClient);
     orderRepository = OrderRepository(this.apiClient);
@@ -26,11 +29,13 @@ class CustomerAppController extends ChangeNotifier {
 
   final ApiClientService apiClient;
   final LocalStorageService storage;
+  final ServerDiscoveryClient discoveryClient;
   final CustomerWebSocketService webSocketService;
   late final MenuRepository menuRepository;
   late final OrderRepository orderRepository;
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
+  Future<void>? _initializationFuture;
 
   bool initialized = false;
   bool menuLoading = false;
@@ -50,7 +55,12 @@ class CustomerAppController extends ChangeNotifier {
       _cart.values.fold(0, (sum, item) => sum + item.lineTotal);
   bool get hasServer => serverConfig?.isValid == true;
 
-  Future<void> initialize() async {
+  Future<void> initialize() {
+    _initializationFuture ??= _initialize();
+    return _initializationFuture!;
+  }
+
+  Future<void> _initialize() async {
     _subscriptions.add(webSocketService.events.listen(_handleWebSocketEvent));
     _subscriptions.add(
       webSocketService.connectionChanges.listen((connected) {
@@ -66,6 +76,48 @@ class CustomerAppController extends ChangeNotifier {
       webSocketService.connect(serverConfig!);
     }
     notifyListeners();
+  }
+
+  Future<bool> autoConnect() async {
+    await initialize();
+    if (connectionTesting) return false;
+
+    connectionTesting = true;
+    connectionMessage = 'Finding restaurant server...';
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final launchConfig = _serverConfigFromLaunchUri();
+      if (launchConfig != null) {
+        connectionMessage = 'Checking launch server ${launchConfig.baseUrl}...';
+        notifyListeners();
+        if (await _activateServer(launchConfig)) return true;
+      }
+
+      final savedConfig = serverConfig;
+      if (savedConfig?.isValid == true) {
+        connectionMessage = 'Checking saved server ${savedConfig!.baseUrl}...';
+        notifyListeners();
+        if (await _activateServer(savedConfig, save: false)) return true;
+      }
+
+      final discoveredConfig = await discoveryClient.findServer();
+      if (discoveredConfig != null) {
+        connectionMessage =
+            'Restaurant server found at ${discoveredConfig.baseUrl}...';
+        notifyListeners();
+        if (await _activateServer(discoveredConfig)) return true;
+      }
+
+      connectionMessage = kIsWeb
+          ? 'No saved server found. Use the Admin local QR or enter the host.'
+          : 'No restaurant server found. Make sure Admin server is running on the same WiFi.';
+      return false;
+    } finally {
+      connectionTesting = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> testConnection(ServerConfig config) async {
@@ -224,6 +276,62 @@ class CustomerAppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> _activateServer(ServerConfig config, {bool save = true}) async {
+    try {
+      await apiClient.getHealth(config);
+      serverConfig = config;
+      if (save) await storage.saveServerConfig(config);
+      connectionMessage = 'Connected to Admin server at ${config.baseUrl}';
+      await loadMenu();
+      return true;
+    } on ApiException catch (error) {
+      connectionMessage = error.message;
+      return false;
+    }
+  }
+
+  ServerConfig? _serverConfigFromLaunchUri() {
+    final uri = Uri.base;
+    final explicitAddress =
+        uri.queryParameters['server'] ??
+        uri.queryParameters['localBaseUrl'] ??
+        uri.queryParameters['baseUrl'];
+    if (explicitAddress != null && explicitAddress.trim().isNotEmpty) {
+      return ServerConfig.fromInput(
+        address: explicitAddress,
+        port: uri.hasPort ? uri.port.toString() : _defaultPort(uri.scheme),
+        secure: _isSecureScheme(uri.scheme),
+      );
+    }
+
+    if (!kIsWeb || !_isPrivateOrLocalHost(uri.host)) return null;
+    return ServerConfig.fromInput(
+      address: uri.origin,
+      port: uri.hasPort ? uri.port.toString() : _defaultPort(uri.scheme),
+      secure: _isSecureScheme(uri.scheme),
+    );
+  }
+
+  bool _isPrivateOrLocalHost(String host) {
+    if (host == 'localhost' || host == '127.0.0.1' || host == '::1') {
+      return true;
+    }
+    final parts = host.split('.').map(int.tryParse).toList(growable: false);
+    if (parts.length != 4 || parts.any((part) => part == null)) return false;
+    final first = parts[0]!;
+    final second = parts[1]!;
+    return first == 10 ||
+        (first == 172 && second >= 16 && second <= 31) ||
+        (first == 192 && second == 168);
+  }
+
+  bool _isSecureScheme(String scheme) {
+    return scheme == 'https' || scheme == 'wss';
+  }
+
+  String _defaultPort(String scheme) =>
+      _isSecureScheme(scheme) ? '443' : '8080';
+
   void _handleWebSocketEvent(WebSocketEvent event) async {
     if (event.type != 'order_status_updated' && event.type != 'order_created') {
       return;
@@ -241,6 +349,7 @@ class CustomerAppController extends ChangeNotifier {
       unawaited(subscription.cancel());
     }
     unawaited(webSocketService.dispose());
+    discoveryClient.dispose();
     apiClient.close();
     super.dispose();
   }

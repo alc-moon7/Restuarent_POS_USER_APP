@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app_controller.dart';
@@ -23,7 +25,7 @@ class _LocalPosMenuAppState extends State<LocalPosMenuApp> {
   void initState() {
     super.initState();
     _controller = CustomerAppController();
-    _controller.initialize();
+    unawaited(_controller.initialize());
   }
 
   @override

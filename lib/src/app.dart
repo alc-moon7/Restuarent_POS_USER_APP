@@ -37,7 +37,7 @@ class _LocalPosMenuAppState extends State<LocalPosMenuApp> {
     return AppScope(
       controller: _controller,
       child: MaterialApp(
-        title: 'Local POS Menu',
+        title: 'Restaurant POS Ordering',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         builder: (context, child) {

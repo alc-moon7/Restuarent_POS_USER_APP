@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -44,8 +44,8 @@ class ApiClientService {
           .post(
             Uri.parse('${config.baseUrl}/orders'),
             headers: const {
-              HttpHeaders.contentTypeHeader: 'application/json',
-              HttpHeaders.acceptHeader: 'application/json',
+              'content-type': 'application/json',
+              'accept': 'application/json',
             },
             body: jsonEncode(payload),
           )
@@ -92,12 +92,12 @@ class ApiClientService {
       return json;
     } on ApiException {
       rethrow;
-    } on SocketException {
-      throw const ApiException(
-        'Server unreachable. Check WiFi, IP address, and that Admin server is running.',
-      );
     } on FormatException {
       throw const ApiException('Server returned invalid JSON.');
+    } on TimeoutException {
+      throw const ApiException(
+        'Request timed out. Check that the Admin server is running.',
+      );
     } on http.ClientException {
       throw const ApiException('Could not connect to the Admin server.');
     } on Object {

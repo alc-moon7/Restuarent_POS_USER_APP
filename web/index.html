@@ -18,21 +18,47 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Restaurant POS customer ordering app for local WiFi menus.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Restaurant POS customer ordering website for menu browsing, cart checkout, and live order tracking.">
+  <meta name="theme-color" content="#006C5B">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Local POS Menu">
+  <meta name="apple-mobile-web-app-title" content="Restaurant POS">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Local POS Menu</title>
+  <title>Restaurant POS Ordering</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html,
+    body {
+      background: #f7f6f1;
+      height: 100%;
+      margin: 0;
+    }
+
+    .app-loader {
+      align-items: center;
+      color: #006c5b;
+      display: flex;
+      font: 700 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      inset: 0;
+      justify-content: center;
+      position: fixed;
+    }
+  </style>
 </head>
 <body>
+  <div class="app-loader" id="app-loader">Loading restaurant menu...</div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('app-loader')?.remove();
+    });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

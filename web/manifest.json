@@ -1,12 +1,12 @@
 {
-    "name": "Local POS Menu",
-    "short_name": "POS Menu",
+    "name": "Restaurant POS Ordering",
+    "short_name": "POS Order",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F8FAF7",
     "theme_color": "#006C5B",
-    "description": "Restaurant POS customer ordering app for local WiFi menus.",
-    "orientation": "portrait-primary",
+    "description": "Restaurant POS customer ordering website for menu browsing, cart checkout, and live order tracking.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

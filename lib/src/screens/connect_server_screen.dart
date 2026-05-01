@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -15,7 +16,11 @@ class ConnectServerScreen extends StatefulWidget {
 class _ConnectServerScreenState extends State<ConnectServerScreen> {
   final _formKey = GlobalKey<FormState>();
   final _ipController = TextEditingController();
-  final _portController = TextEditingController(text: '8080');
+  late final bool _startsSecure = Uri.base.scheme == 'https';
+  late final _portController = TextEditingController(
+    text: _startsSecure ? '443' : '8080',
+  );
+  late bool _secureConnection = _startsSecure;
   bool _hydrated = false;
 
   @override
@@ -26,6 +31,7 @@ class _ConnectServerScreenState extends State<ConnectServerScreen> {
     if (config != null) {
       _ipController.text = config.ip;
       _portController.text = config.port.toString();
+      _secureConnection = config.secure;
     }
     _hydrated = true;
   }
@@ -85,13 +91,17 @@ class _ConnectServerScreenState extends State<ConnectServerScreen> {
                           controller: _ipController,
                           keyboardType: TextInputType.url,
                           decoration: const InputDecoration(
-                            labelText: 'Admin IP address',
-                            hintText: '192.168.0.105',
+                            labelText: 'Admin host or URL',
+                            hintText: '192.168.0.105 or api.restaurant.com',
                             prefixIcon: Icon(Icons.router_outlined),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Admin IP is required';
+                            final host = value?.trim() ?? '';
+                            if (host.isEmpty) {
+                              return 'Admin host is required';
+                            }
+                            if (host.contains(RegExp(r'\s'))) {
+                              return 'Host cannot contain spaces';
                             }
                             return null;
                           },
@@ -112,6 +122,15 @@ class _ConnectServerScreenState extends State<ConnectServerScreen> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 12),
+                        _SecureConnectionSwitch(
+                          secure: _secureConnection,
+                          onChanged: _setSecureConnection,
+                        ),
+                        if (kIsWeb && Uri.base.scheme == 'https') ...[
+                          const SizedBox(height: 12),
+                          _HostedWebNotice(secure: _secureConnection),
+                        ],
                         if (app.connectionMessage != null) ...[
                           const SizedBox(height: 14),
                           _ConnectionMessage(message: app.connectionMessage!),
@@ -162,10 +181,93 @@ class _ConnectServerScreenState extends State<ConnectServerScreen> {
     Navigator.pushReplacementNamed(context, '/menu');
   }
 
+  void _setSecureConnection(bool value) {
+    final currentPort = _portController.text.trim();
+    setState(() {
+      _secureConnection = value;
+      if (currentPort.isEmpty || currentPort == (value ? '8080' : '443')) {
+        _portController.text = value ? '443' : '8080';
+      }
+    });
+  }
+
   ServerConfig _configFromFields() {
-    return ServerConfig(
-      ip: _ipController.text.trim(),
-      port: int.tryParse(_portController.text.trim()) ?? 8080,
+    return ServerConfig.fromInput(
+      address: _ipController.text,
+      port: _portController.text,
+      secure: _secureConnection,
+    );
+  }
+}
+
+class _SecureConnectionSwitch extends StatelessWidget {
+  const _SecureConnectionSwitch({
+    required this.secure,
+    required this.onChanged,
+  });
+
+  final bool secure;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: SwitchListTile.adaptive(
+        value: secure,
+        onChanged: onChanged,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        activeThumbColor: AppColors.primary,
+        title: const Text(
+          'Use HTTPS / WSS',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text(
+          secure
+              ? 'Connecting with secure browser protocols.'
+              : 'Connecting with local HTTP and WS.',
+        ),
+      ),
+    );
+  }
+}
+
+class _HostedWebNotice extends StatelessWidget {
+  const _HostedWebNotice({required this.secure});
+
+  final bool secure;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = secure ? AppColors.success : AppColors.warning;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            secure ? Icons.lock_outline : Icons.warning_amber_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              secure
+                  ? 'Cloudflare hosted mode expects HTTPS/WSS Admin servers.'
+                  : 'Hosted HTTPS pages can block plain HTTP/WS Admin servers.',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

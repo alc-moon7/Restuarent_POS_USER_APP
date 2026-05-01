@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+node_modules/
+dist/
+npm-debug.log*
 
 # Symbolication related
 app.*.symbols

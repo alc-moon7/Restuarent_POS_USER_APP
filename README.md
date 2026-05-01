@@ -1,101 +1,96 @@
-# Restaurant POS Ordering
+# Hybrid POS Customer Web
 
-Production-ready Flutter customer ordering app for the Restaurant POS LAN system.
-It connects to the Admin/Server Flutter app over the same WiFi network and does
-not require internet when used locally. The same Flutter app also builds as a
-responsive web app for Cloudflare Pages.
+React/Vite customer ordering web app for the Hybrid Restaurant POS system.
 
-## Features
+## Modes
 
-- Splash and server connection flow
-- Saved Admin host/port/protocol with connection test
-- Menu browsing with search, category filters, refresh, empty/error states
-- Cart with quantity controls, table number, customer note, duplicate-submit guard
-- Order placement through `POST /orders`
-- Live order tracking over `ws://HOST:PORT/ws` or `wss://HOST:PORT/ws` with reconnect
-- Responsive phone/tablet/desktop UI with a premium restaurant ordering theme
-- Cloudflare Pages build script and static headers
+Local offline mode:
 
-## Admin API Used
+```txt
+Admin Flutter APK -> http://ADMIN_LOCAL_IP:8080/customer
+Customer browser -> same-origin GET /menu, POST /orders, WS /ws
+```
 
-- `GET /health`
-- `GET /menu`
-- `POST /orders`
-- `GET /orders`
-- `WS /ws`
+Online cloud mode:
+
+```txt
+https://menu.yourdomain.com/r/:restaurantId/o/:outletId
+VITE_CLOUD_API_URL=https://api.example.com
+```
+
+Browsers cannot reliably listen to LAN UDP broadcasts, so this app does not use
+UDP discovery. Local users scan the Admin app QR and open `/customer`.
+
+## Environment
+
+```sh
+cp .env.example .env
+```
+
+```txt
+VITE_CLOUD_API_URL=https://api.example.com
+VITE_DEFAULT_RESTAURANT_ID=rest_001
+VITE_DEFAULT_OUTLET_ID=outlet_001
+VITE_APP_NAME=Local POS Menu
+```
 
 ## Run
 
-```bash
-flutter pub get
-flutter run
+```sh
+npm install
+npm run dev
 ```
 
-Run as a local website:
+## Build
 
-```bash
-flutter run -d chrome
+```sh
+npm run build
 ```
 
-Build a debug APK:
+Output directory:
 
-```bash
-flutter build apk --debug
-```
-
-Build the production web bundle:
-
-```bash
-flutter build web --release
+```txt
+dist
 ```
 
 ## Cloudflare Pages
 
-Use these settings when connecting the Git repository to Cloudflare Pages:
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment variable: `VITE_CLOUD_API_URL=https://your-api-domain.com`
 
-- Framework preset: `None`
-- Build command: `bash ./cloudflare_build.sh`
-- Build output directory: `build/web`
-- Root directory: `/`
+## Routes
 
-Optional environment variables:
+- `/` smart connection resolver
+- `/customer` local offline mode
+- `/r/:restaurantId/o/:outletId` online cloud menu
+- `/cart`
+- `/order/:orderId`
+- `/settings`
 
-- `FLUTTER_VERSION=stable`
-- `FLUTTER_BASE_HREF=/`
+## Admin Local Server
 
-Cloudflare Pages is served over HTTPS. If the hosted website needs to connect to
-the Admin server, the Admin API should be available over HTTPS/WSS, for example
-through a secure domain or Cloudflare Tunnel. The Admin API must also allow CORS
-from your Pages domain. Plain `http://` and `ws://` LAN servers are best for
-local browser/device testing.
+The Admin Flutter app should bundle the production `dist` output and serve:
 
-## Customer Device Flow
+- `GET /customer`
+- `GET /assets/*`
+- fallback customer routes such as `/cart`, `/order/:id`, `/settings`
+- existing API endpoints: `/health`, `/menu`, `/orders`, `/ws`
 
-1. Start the Admin server from the Admin app.
-2. Put the customer device on the same WiFi network.
-3. Enter the Admin host and port, for example `192.168.0.105` and `8080`.
-   Use HTTPS/WSS only when the Admin server supports it.
-4. Tap **Test Connection**, then **Continue**.
-5. Browse menu, add items, enter table number, and place the order.
+Offline QR example:
 
-Example URLs:
-
-```js
-fetch("http://ADMIN_LOCAL_IP:8080/menu")
-
-fetch("http://ADMIN_LOCAL_IP:8080/orders", {
-  method: "POST",
-  headers: {"Content-Type": "application/json"},
-  body: JSON.stringify(orderPayload)
-})
-
-const ws = new WebSocket("ws://ADMIN_LOCAL_IP:8080/ws")
+```txt
+http://192.168.0.105:8080/customer
 ```
 
-Secure web example:
+Online URL example:
 
-```js
-fetch("https://api.example.com:443/menu")
-
-const ws = new WebSocket("wss://api.example.com:443/ws")
+```txt
+https://menu.yourdomain.com/r/rest_001/o/outlet_001
 ```
+
+## Browser Limitation
+
+If a hosted HTTPS page tries to call a local `http://192.168.x.x:8080` API,
+the browser may block mixed content. For offline ordering, users should connect
+to restaurant WiFi and scan the local Admin QR again.

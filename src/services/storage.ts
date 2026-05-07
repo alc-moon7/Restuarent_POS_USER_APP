@@ -10,7 +10,9 @@ const keys = {
 };
 
 export const envConfig = {
-  cloudApiUrl: import.meta.env.VITE_CLOUD_API_URL ?? 'https://api.example.com',
+  cloudApiUrl:
+    import.meta.env.VITE_CLOUD_API_URL ??
+    'https://vnhxfvtpkgykatvbrczn.supabase.co/functions/v1/pos-api',
   restaurantId: import.meta.env.VITE_DEFAULT_RESTAURANT_ID ?? 'rest_001',
   outletId: import.meta.env.VITE_DEFAULT_OUTLET_ID ?? 'outlet_001',
   appName: import.meta.env.VITE_APP_NAME ?? 'Local POS Menu',

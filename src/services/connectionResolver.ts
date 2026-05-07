@@ -35,7 +35,10 @@ export async function resolveConnection(): Promise<ResolveResult> {
   const restaurantId = currentRestaurantId();
   const outletId = currentOutletId();
   const cloudApiUrl = getCloudApiUrl();
-  const localBaseUrl = getQueryParam('localBaseUrl');
+  const localBaseUrl =
+    getQueryParam('localBaseUrl') ||
+    getQueryParam('server') ||
+    getQueryParam('baseUrl');
   const attempts = cloneAttempts();
   const path = window.location.pathname;
   const hostname = window.location.hostname;
@@ -63,17 +66,6 @@ export async function resolveConnection(): Promise<ResolveResult> {
     }
     attempts[0] = { ...attempts[0], status: 'failed' };
 
-    if (path === '/customer') {
-      return {
-        ok: false,
-        error:
-          'Restaurant server is unavailable. Please connect to restaurant WiFi and scan the QR again.',
-        attempts,
-        restaurantId,
-        outletId,
-        cloudApiUrl,
-      };
-    }
   }
 
   attempts[1] = { ...attempts[1], status: 'running' };
